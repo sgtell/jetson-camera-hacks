@@ -12,7 +12,7 @@
 # attempt to stream video over the network.
 #
 # one should be able to view the stream with a gstreamer command like this:
-#   gst-launch-1.0 -vvv -e udpsrc port=5805 ! application/x-rtp,encoding-name=JPEG,payload=26 ! rtpjpegdepay ! jpegdec ! autovideosink
+#   gst-launch-1.0 -vvv -e udpsrc port=5804 ! application/x-rtp,encoding-name=JPEG,payload=26 ! rtpjpegdepay ! jpegdec ! autovideosink
 #
 # but I don't have it working yet
 #
@@ -96,12 +96,14 @@ def get_write_pipeline_string(width=320,
                           framerate=30,
                           bitrate=1000,
                           host="localhost",
-                          port=5805):
+                              port=5804):
 
-    
 #    return "appsrc ! video/x-raw, format=(string)BGR, width=(int)%d, height=(int)%d, framerate=(fraction)%d/1 ! videoconvert ! omxh264enc bitrate=%d ! video/x-h264, stream-format=(string)byte-stream ! h264parse ! rtph264pay ! udpsink host=%s port=%d" % (width, height, framerate, bitrate, host, port);
 #    return "appsrc ! video/x-raw, format=(string)BGR, width=(int)%d, height=(int)%d, framerate=(fraction)%d/1 ! videoconvert ! jpegenc ! rtpjpegpay video/x-jpeg, stream-format=(string)byte-stream ! udpsink host=%s port=%d " % (width, height, framerate, host, port);
-    return "appsrc ! videoconvert ! jpegenc ! rtpjpegpay ! udpsink host=%s port=%d " % (host, port);
+#    return "appsrc ! videoconvert ! jpegenc ! rtpjpegpay ! udpsink host=%s port=%d " % (host, port);
+#    return "appsrc ! video/x-raw, format=(string)BGR, width=(int)%d, height=(int)%d, framerate=(fraction)%d/1 ! videoconvert ! jpegenc ! rtpjpegpay ! udpsink host=%s port=%d " % (width, height, framerate, host, port);
+# 	return "appsrc ! videoconvert ! video/x-raw,format=YUY2,width=%d,height=%d,framerate=%d/1 ! jpegenc ! rtpjpegpay ! filesink location=test.dat" % (width, height, framerate);
+ return "appsrc ! videoconvert ! video/x-raw,format=YUY2,width=%d,height=%d,framerate=%d/1 ! jpegenc ! rtpjpegpay ! udpsink host=%s port=%d" % (width, height, framerate, host, port);
 
 def stream_camera(dirname, camsetup, host):
     framecount = 0;
@@ -116,14 +118,13 @@ def stream_camera(dirname, camsetup, host):
 
     wpipe = get_write_pipeline_string(640, 480, host=host);
     printf("write_pipeline=\"%s\n", wpipe);
-    fourcc = cv2.VideoWriter_fourcc('M','J','P','G') 
-#    strm = cv2.VideoWriter_GStreamer();
-    strm = cv2.VideoWriter();
-#    strm =  cv2.VideoWriter(wpipe, );
-    strm.open(wpipe, fourcc, 30, (640, 480), True);
+
+    strm = cv2.VideoWriter(wpipe, 0, 30, (640, 480), True);
+    if not strm.isOpened():
+	print("failed to open streaming pipe");
+
     t_start = time.time();
     t_done = 0;
-
     t_lastcap = 0;
     for i in range(0,2000):
             ret_val, img = cap.read()

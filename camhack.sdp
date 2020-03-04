@@ -1,0 +1,6 @@
+v=0
+s=nanovideo
+c=IN IP4 0.0.0.0
+t=0 
+m=video 5804 RTP/AVP 26
+
