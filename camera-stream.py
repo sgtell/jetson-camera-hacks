@@ -26,7 +26,7 @@ import os
 import glob
 import sre
 
-localsave_frames = False;
+localsave_frames = True;
 
 # make python suck less
 def printf(format, *args):
@@ -43,7 +43,6 @@ def get_next_image_dir():
      lst = glob.glob(dnbase + '-[0-9][0-9][0-9][0-9]');
      if(lst):
             lst.sort();
-            print lst
             last = lst[ len(lst)-1 ];
             m = sre.search(sre.compile(dnbase + "-(\d+)$"), last);
             nlast = int(m.group(1))
@@ -153,8 +152,9 @@ def stream_camera(dirname, camsetup, host):
 	            savecount += 1;
 	 	    save_fname = "%s/img-%04d.jpg" % (dirname, savecount);
 	 	    cv2.imwrite(save_fname,img);
-                    printf("saved %s\n", save_fname);
+                    t_savedone = time.time();
                     t_lastcap = t_now;
+                    printf("saved %s in %.3f sec\n", save_fname, t_savedone-t_lastcap);
             
     t_done = time.time();
     t_total = t_done - t_start;

@@ -19,6 +19,7 @@ import argparse
 import os
 import glob
 import sre
+import threading
 
 def printf(format, *args):
      """Format args with the first argument as format string, and print.
@@ -48,6 +49,54 @@ def get_next_image_dir():
      os.mkdir(dirname);
      return dirname;
 
+class image_saver:
+    def __init__(self, dirname):
+        self.dirname = dirname;
+        self.imgno = 0;
+        self.running = False;
+	self.running = True;
+	self.datacond = threading.Condition();
+        self.img = None;	
+	self.statuslock = threading.Lock();
+        self.busy = False;
+        printf("image_saver starting thread for %s\n", self.dirname);
+	self.thread = threading.Thread(name="imageSaver", target=self.savethread);
+        self.thread.setDaemon(True);
+        self.thread.start();
+#        for t in threading.enumerate():
+#             	printf("thread %s\n", t);
+	
+    def savethread(self):
+        img = None;
+        #printf("savethread running %s\n", self.running);
+	while(self.running):		
+	    with(self.datacond):
+                self.datacond.wait();
+       		img = self.img;
+                with(self.statuslock):
+                      self.busy = True;
+            t0 = time.time();
+ 	    save_fname = "%s/img-%04d.jpg" % (self.dirname, self.imgno);
+	    self.imgno += 1;
+            cv2.imwrite(save_fname, img);
+            t1 = time.time();
+ 	    printf("saved %s in %.3f sec\n", save_fname, t1-t0);
+            with(self.statuslock):
+                self.busy = False;
+            img = None;
+        printf("savethread exiting\n");
+        
+    def saveimg(self, img):
+	lbusy = None;
+        with(self.statuslock):
+	    lbusy = self.busy;
+        if(lbusy):
+        	printf("image %d save still busy; skipping\n", self.imgno);
+	        return;
+	with(self.datacond):
+		self.img = img;
+                self.datacond.notifyAll();
+                
 # get_pipeline_string - returns a GStreamer pipeline string.
 def get_pipeline_string(
           camsetup=0,
@@ -55,7 +104,7 @@ def get_pipeline_string(
     capture_height=720,
     display_width=1280,
     display_height=720,
-    framerate=60,
+    framerate=30,
     flip_method=0,
 ):
     if(camsetup == 0):
@@ -87,7 +136,7 @@ def get_pipeline_string(
 
 def show_camera(dirname, camsetup):
     framecount = 0;
-    savecount = 0;
+    saver = image_saver(dirname);
     
     # To flip the image, modify the flip_method parameter (0 and 2 are the most common)
     pipeline = get_pipeline_string(camsetup, flip_method=0);
@@ -118,18 +167,14 @@ def show_camera(dirname, camsetup):
 
             t_now = time.time();
             if(framecount > 10 and (t_now - t_lastcap) > 1.0 ):
-                 # skip the first few frames, then save one per second
-	            savecount += 1;
-	 	    save_fname = "%s/img-%04d.jpg" % (dirname, savecount);
-	 	    cv2.imwrite(save_fname,img);
-                    printf("saved %s\n", save_fname);
-                    t_lastcap = t_now;
+		# skip the first few frames, then save one per second
+		saver.saveimg(img);
+ 		t_lastcap = t_now;
             
     t_done = time.time();
     t_total = t_done - t_start;
     print("%d frames in %.3f seconds; %.3f/sec\n"%(framecount, t_total, framecount/t_total));
     cap.release()
-
     
 
 if __name__ == "__main__":
